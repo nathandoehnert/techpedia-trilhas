@@ -1,0 +1,28 @@
+name: Auto-Approve Trilhas
+on:
+  pull_request:
+    types: [opened, reopened, labeled]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar Votos
+        uses: actions/github-script@v6
+        env:
+          MIN_VOTES: 5
+        with:
+          script: |
+            const { data: reactions } = await github.rest.reactions.listForIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const upvotes = reactions.filter(r => r.content === '+1').length;
+            if (upvotes >= parseInt(process.env.MIN_VOTES)) {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+              });
+            }
