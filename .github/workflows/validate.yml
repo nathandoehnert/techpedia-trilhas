@@ -1,0 +1,15 @@
+name: Validate Trilhas
+on: [pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar Estrutura
+        run: |
+          # Valida campos obrigatórios
+          for file in trilhas/*.md; do
+            grep -q "title:" "$file" || { echo "❌ $file: Falta 'title'"; exit 1; }
+            grep -q "area:" "$file" || { echo "❌ $file: Falta 'area'"; exit 1; }
+          done
