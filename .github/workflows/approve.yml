@@ -1,15 +1,17 @@
-name: Auto-Merge Approved PRs
+name: Auto-Merge Community Approved PRs
 on:
   pull_request:
     types: [opened, reopened, synchronize]
 
 jobs:
-  check-approvals:
+  process-approval:
     runs-on: ubuntu-latest
     steps:
-      - name: Count +1 reactions
-        id: count-reactions
+      - name: Count +1 Reactions
+        id: count-votes
         uses: actions/github-script@v6
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
         with:
           script: |
             const { data: reactions } = await github.rest.reactions.listForIssue({
@@ -18,12 +20,13 @@ jobs:
               issue_number: context.payload.pull_request.number,
             });
             const upvotes = reactions.filter(r => r.content === '+1').length;
-            core.setOutput('vote_count', upvotes);
-            
-      - name: Merge PR if approved
-        if: steps.count-reactions.outputs.vote_count >= 1
-        uses: peter-evans/enable-pull-request-automerge@v2
+            core.setOutput('total_votes', upvotes);
+            console.log(`Votos recebidos: ${upvotes}`);
+
+      - name: Merge Approved PR
+        if: steps.count-votes.outputs.total_votes >= 1
+        uses: ridedott/merge-me-action@v2
         with:
-          token: ${{ secrets.AUTO_MERGE_TOKEN }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: merge
+          GITHUB_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
+          MERGE_METHOD: 'merge'
+          PRESET: 'DEPENDABOT_MINOR'
