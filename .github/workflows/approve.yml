@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: read
   checks: write
   statuses: write
 
@@ -16,11 +17,10 @@ jobs:
       - name: Checkout
         uses: hmarr/auto-approve-action@v4
         
-      - name: Merge PR
+      - name: Verificar Votos
         uses: actions/github-script@v6
         env:
-          GITHUB_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
-          MIN_VOTES: 5
+          MIN_VOTES: 1
         with:
           script: |
             const { data: reactions } = await github.rest.reactions.listForIssue({
@@ -28,29 +28,11 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.payload.pull_request.number,
             });
-            
             const upvotes = reactions.filter(r => r.content === '+1').length;
-            
             if (upvotes >= parseInt(process.env.MIN_VOTES)) {
-              try {
-                // Método garantido para merge
-                await github.request('POST /repos/{owner}/{repo}/merges', {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  base: context.payload.pull_request.base.ref,
-                  head: context.payload.pull_request.head.ref,
-                  commit_message: `Auto-merged PR #${context.payload.pull_request.number}`
-                });
-                
-                // Fecha o PR
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.payload.pull_request.number,
-                  state: 'closed'
-                });
-              } catch (error) {
-                core.error(`Merge failed: ${error}`);
-                core.setFailed(error.message);
-              }
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+              });
             }
