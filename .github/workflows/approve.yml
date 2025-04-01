@@ -12,6 +12,7 @@ jobs:
         env:
           MIN_VOTES: 1
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { data: reactions } = await github.rest.reactions.listForIssue({
               owner: context.repo.owner,
