@@ -1,0 +1,19 @@
+name: Auto-Approve Workflows
+on:
+  workflow_run:
+    workflows: ["Auto-Approve Trilhas"]
+    types: [requested]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve workflow
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.actions.approveWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
