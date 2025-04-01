@@ -3,34 +3,55 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+# Permissões críticas (NOVO)
 permissions:
   contents: write
   pull-requests: write
+  checks: write
+  statuses: write
 
 jobs:
   approve:
     runs-on: ubuntu-latest
     steps:
-      - name: Verificar Votos e Aprovar
+      - name: Merge Automático
         uses: actions/github-script@v6
         env:
           MIN_VOTES: 1
         with:
           script: |
-            const { data: reactions } = await github.rest.reactions.listForIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-            });
-            const upvotes = reactions.filter(r => r.content === '+1').length;
-            if (upvotes >= parseInt(process.env.MIN_VOTES)) {
-              await github.request(
-                'PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge',
-                {
+            try {
+              // Verifica reações
+              const { data: reactions } = await github.rest.reactions.listForIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+              });
+              
+              const upvotes = reactions.filter(r => r.content === '+1').length;
+              
+              if (upvotes >= parseInt(process.env.MIN_VOTES)) {
+                // Método alternativo que funciona
+                await github.request(
+                  'PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.payload.pull_request.number,
+                    merge_method: 'merge',
+                    commit_title: `Merge PR #${context.payload.pull_request.number}`,
+                    commit_message: 'Aprovado automaticamente via votação comunitária'
+                  }
+                );
+                
+                // Fecha o PR após merge
+                await github.rest.issues.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: context.payload.pull_request.number,
-                  merge_method: 'merge'
-                }
-              );
+                  issue_number: context.payload.pull_request.number,
+                  state: 'closed'
+                });
+              }
+            } catch (error) {
+              console.error('Erro no merge:', error);
+              core.setFailed(error.message);
             }
