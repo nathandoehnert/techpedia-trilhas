@@ -1,9 +1,8 @@
-name: Auto-Approve Trilhas
+name: Auto-Merge Approved PRs
 on:
   pull_request:
     types: [opened, reopened, synchronize]
 
-# Permissões críticas (NOVO)
 permissions:
   contents: write
   pull-requests: write
@@ -11,47 +10,47 @@ permissions:
   statuses: write
 
 jobs:
-  approve:
+  approve-and-merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Merge Automático
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Merge PR
         uses: actions/github-script@v6
         env:
-          MIN_VOTES: 1
+          GITHUB_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN }}
+          MIN_VOTES: 5
         with:
           script: |
-            try {
-              // Verifica reações
-              const { data: reactions } = await github.rest.reactions.listForIssue({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-              });
-              
-              const upvotes = reactions.filter(r => r.content === '+1').length;
-              
-              if (upvotes >= parseInt(process.env.MIN_VOTES)) {
-                // Método alternativo que funciona
-                await github.request(
-                  'PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: context.payload.pull_request.number,
-                    merge_method: 'merge',
-                    commit_title: `Merge PR #${context.payload.pull_request.number}`,
-                    commit_message: 'Aprovado automaticamente via votação comunitária'
-                  }
-                );
+            const { data: reactions } = await github.rest.reactions.listForIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            
+            const upvotes = reactions.filter(r => r.content === '+1').length;
+            
+            if (upvotes >= parseInt(process.env.MIN_VOTES)) {
+              try {
+                // Método garantido para merge
+                await github.request('POST /repos/{owner}/{repo}/merges', {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  base: context.payload.pull_request.base.ref,
+                  head: context.payload.pull_request.head.ref,
+                  commit_message: `Auto-merged PR #${context.payload.pull_request.number}`
+                });
                 
-                // Fecha o PR após merge
+                // Fecha o PR
                 await github.rest.issues.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.payload.pull_request.number,
                   state: 'closed'
                 });
+              } catch (error) {
+                core.error(`Merge failed: ${error}`);
+                core.setFailed(error.message);
               }
-            } catch (error) {
-              console.error('Erro no merge:', error);
-              core.setFailed(error.message);
             }
