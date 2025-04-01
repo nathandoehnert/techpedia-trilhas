@@ -14,7 +14,7 @@ jobs:
       - name: Verificar Votos e Aprovar
         uses: actions/github-script@v6
         env:
-          MIN_VOTES: 5
+          MIN_VOTES: 1
         with:
           script: |
             const { data: reactions } = await github.rest.reactions.listForIssue({
