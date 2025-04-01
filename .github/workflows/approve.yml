@@ -1,18 +1,21 @@
 name: Auto-Approve Trilhas
 on:
   pull_request:
-    types: [opened, reopened, labeled]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   approve:
     runs-on: ubuntu-latest
     steps:
-      - name: Verificar Votos
+      - name: Verificar Votos e Aprovar
         uses: actions/github-script@v6
         env:
-          MIN_VOTES: 1
+          MIN_VOTES: 5
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { data: reactions } = await github.rest.reactions.listForIssue({
               owner: context.repo.owner,
@@ -21,9 +24,13 @@ jobs:
             });
             const upvotes = reactions.filter(r => r.content === '+1').length;
             if (upvotes >= parseInt(process.env.MIN_VOTES)) {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.payload.pull_request.number,
-              });
+              await github.request(
+                'PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.payload.pull_request.number,
+                  merge_method: 'merge'
+                }
+              );
             }
